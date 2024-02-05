@@ -8,6 +8,7 @@ export type InitOptions = {
     autoReload: boolean;
     autoReloadInterval: number;
     setProcessEnv: boolean;
+    modifyConfigBehavior: ModifyConfigBehavior;
 }
 
 export type Environment = {
@@ -16,3 +17,9 @@ export type Environment = {
 }
 
 export type ConfigurationsRecord = Record<string, any>;
+
+export enum ModifyConfigBehavior {
+    LOCAL_ONLY = "LOCAL_ONLY",
+    FIRST_ENVIRONMENT = "FIRST_ENVIRONMENT",
+    ALL_ENVIRONMENTS = "ALL_ENVIRONMENTS",
+}

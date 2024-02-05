@@ -1,5 +1,5 @@
 import { defaults } from "lodash";
-import { ConfigurationsRecord, InitOptions } from "./types";
+import { ConfigurationsRecord, InitOptions, ModifyConfigBehavior } from "./types";
 import { EnvProvider } from "./providers";
 import EventEmitter from "events";
 import { deepEqual } from "./utils";
@@ -42,6 +42,7 @@ export class Configoat {
         autoReload: true,
         autoReloadInterval: 1000*60,
         setProcessEnv: false,
+        modifyConfigBehavior: ModifyConfigBehavior.FIRST_ENVIRONMENT,
     };
     private eventEmitter: EventEmitter = new EventEmitter();
     private configoatProvider: ConfigoatProvider = new ConfigoatProvider();
@@ -53,7 +54,11 @@ export class Configoat {
             return this.configs[key as string];
         },
         set: (target, key, value) => {
-            this.configs[key as string] = value;
+            this.setConfig(key as string, value);
+            return true;
+        },
+        deleteProperty: (target, key) => {
+            this.deleteConfig(key as string);
             return true;
         }
     });
@@ -129,5 +134,47 @@ export class Configoat {
         setInterval(() => {
             this.reload();
         }, interval);   
+    }
+
+    private async setConfig(key: string, value: any) {
+        this.configs[key] = value;
+
+        if (this.options.setProcessEnv) {
+            process.env[key] = value;
+        }
+
+        if (this.options.modifyConfigBehavior === ModifyConfigBehavior.FIRST_ENVIRONMENT) {
+            await this.configoatProvider.updateFirst(key, value);
+        }
+        else if (this.options.modifyConfigBehavior === ModifyConfigBehavior.ALL_ENVIRONMENTS) {
+            await this.configoatProvider.updateAll(key, value);
+        }
+        else if (this.options.modifyConfigBehavior === ModifyConfigBehavior.LOCAL_ONLY) {
+            // Do nothing
+        }
+        else {
+            throw new Error(`Invalid modifyConfigBehavior: ${this.options.modifyConfigBehavior}`);
+        }
+    }
+
+    private async deleteConfig(key: string) {
+        delete this.configs[key];
+
+        if (this.options.setProcessEnv) {
+            delete process.env[key];
+        }
+
+        if (this.options.modifyConfigBehavior === ModifyConfigBehavior.FIRST_ENVIRONMENT) {
+            await this.configoatProvider.deleteFirst(key);
+        }
+        else if (this.options.modifyConfigBehavior === ModifyConfigBehavior.ALL_ENVIRONMENTS) {
+            await this.configoatProvider.deleteAll(key);
+        }
+        else if (this.options.modifyConfigBehavior === ModifyConfigBehavior.LOCAL_ONLY) {
+            // Do nothing
+        }
+        else {
+            throw new Error(`Invalid modifyConfigBehavior: ${this.options.modifyConfigBehavior}`);
+        }
     }
 }
