@@ -1,0 +1,30 @@
+{
+  "name": "configoat",
+  "version": "0.0.1",
+  "description": "Configuration manager made for teams",
+  "main": "build/index.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Configoat/NodeJS-SDK.git"
+  },
+  "keywords": [
+    "configoat",
+    "configurations",
+    "configs",
+    "secrets",
+    "feature",
+    "flags"
+  ],
+  "author": "Configoat",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Configoat/NodeJS-SDK/issues"
+  },
+  "homepage": "https://configoat.com",
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
