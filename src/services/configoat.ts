@@ -1,20 +1,16 @@
 import axios, { AxiosInstance } from "axios";
-import { ConfigurationsRecord, Environment } from "../types";
-import { Provider } from "./base";
+import { ExposedConfigurationsRecord, Environment, ModifyConfigBehavior } from "../types";
 import { defaults } from "lodash";
+import { IService } from "./base";
 
-export class ConfigoatProvider extends Provider {
-    public environments: Environment[] = [];
-    public apiUrl: string = "https://api.configoat.com";
+export class ConfigoatService implements IService {
     private rawConfigs: any[] = [];
     private axios: AxiosInstance = axios.create();
 
-    constructor() {
-        super("configoat");
-    }
+    constructor(private environments: Environment[], private apiUrl: string) {}
 
-    public async getAll(): Promise<ConfigurationsRecord> {
-        let configs: ConfigurationsRecord = {};
+    public async get(): Promise<ExposedConfigurationsRecord> {
+        let configs: ExposedConfigurationsRecord = {};
         let _rawConfigs: any[] = [];
 
         for (const environment of this.environments) {
@@ -69,6 +65,21 @@ export class ConfigoatProvider extends Provider {
         });
 
         this.rawConfigs.push(resp.data.configs.at(-1));
+    }
+
+    async update(key: string, value: any, modifyConfigBehavior: ModifyConfigBehavior) {
+        if (modifyConfigBehavior === ModifyConfigBehavior.FIRST) {
+            await (value === undefined ? this.deleteFirst(key) : this.updateFirst(key, value));
+        }
+        else if (modifyConfigBehavior === ModifyConfigBehavior.ALL) {
+            await (value === undefined ? this.deleteAll(key) : this.updateAll(key, value));
+        }
+        else if (modifyConfigBehavior === ModifyConfigBehavior.MEMORY) {
+            // Do nothing
+        }
+        else {
+            throw new Error(`Invalid modifyConfigBehavior: ${modifyConfigBehavior}`);
+        }
     }
 
     async updateFirst(key: string, value: string) {

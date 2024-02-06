@@ -1,10 +1,12 @@
-import { Provider } from "./providers";
+import { IService } from "./services";
 
 export type InitOptions = {
     apiUrl: string;
     environments: Environment[];
-    providers: Provider[];
-    defaultProviders: boolean;
+    services: IService[];
+    fallbacks: IService[];
+    configoatProvider: boolean;
+    processEnvProvider: boolean;
     autoReload: boolean;
     autoReloadInterval: number;
     setProcessEnv: boolean;
@@ -16,10 +18,20 @@ export type Environment = {
     token: string;
 }
 
-export type ConfigurationsRecord = Record<string, any>;
+export type ExposedConfigurationsRecord = Record<string, any>;
+
+export type InternalConfigurationsRecord = {
+    name: string,
+    config: ExposedConfigurationsRecord,
+    options: ProviderOptions,
+}[];
 
 export enum ModifyConfigBehavior {
-    LOCAL_ONLY = "LOCAL_ONLY",
-    FIRST_ENVIRONMENT = "FIRST_ENVIRONMENT",
-    ALL_ENVIRONMENTS = "ALL_ENVIRONMENTS",
+    MEMORY = "MEMORY",
+    FIRST = "FIRST",
+    ALL = "ALL",
+}
+
+export type ProviderOptions = {
+    useInFallback: boolean;
 }

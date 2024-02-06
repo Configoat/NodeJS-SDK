@@ -1,13 +1,16 @@
 import { defaults } from "lodash";
-import { ConfigurationsRecord, InitOptions, ModifyConfigBehavior } from "./types";
-import { EnvProvider } from "./providers";
+import { ExposedConfigurationsRecord, InitOptions, InternalConfigurationsRecord, ModifyConfigBehavior, ProviderOptions } from "./types";
 import EventEmitter from "events";
 import { deepEqual } from "./utils";
-import { ConfigoatProvider } from "./providers/configoat";
+import { ConfigoatService, EnvService, MemoryService, LocalJSONService } from "./services";
+
+const defaultProviderOptions: ProviderOptions = {
+    useInFallback: true,
+};
 
 export class Configoat {
     // Static
-    
+
     private static instance: Configoat = new Configoat();
     static get env() {
         return Configoat.instance.env;
@@ -33,88 +36,140 @@ export class Configoat {
     }
 
     // Instance
-    
+
     private options: InitOptions = {
         apiUrl: "https://api.configoat.com",
-        providers: [],
+        services: [],
         environments: [],
-        defaultProviders: true,
+        fallbacks: [
+            new LocalJSONService(),
+        ],
+        configoatProvider: true,
+        processEnvProvider: true,
         autoReload: true,
-        autoReloadInterval: 1000*60,
+        autoReloadInterval: 1000 * 60,
         setProcessEnv: false,
-        modifyConfigBehavior: ModifyConfigBehavior.FIRST_ENVIRONMENT,
+        modifyConfigBehavior: ModifyConfigBehavior.FIRST,
     };
     private eventEmitter: EventEmitter = new EventEmitter();
-    private configoatProvider: ConfigoatProvider = new ConfigoatProvider();
+    private configoatProvider?: ConfigoatService;
     // Internal configs list
-    private configs: ConfigurationsRecord = {};
+    private configs: InternalConfigurationsRecord = [];
     // Exposed configs list
-    public env: ConfigurationsRecord = new Proxy({}, {
+    public env: ExposedConfigurationsRecord = new Proxy({}, {
         get: (target, key) => {
-            return this.configs[key as string];
+            return this.configurationRecord[key as string];
         },
         set: (target, key, value) => {
             this.setConfig(key as string, value);
             return true;
         },
         deleteProperty: (target, key) => {
-            this.deleteConfig(key as string);
+            this.setConfig(key as string, undefined);
             return true;
         }
     });
 
+    private get configurationRecord(): ExposedConfigurationsRecord {
+        return this.configs.reduce((acc, { config }) => (defaults(acc, config)), {});
+    }
+
     public async init(options: Partial<InitOptions> = {}) {
         this.options = defaults(options, this.options);
 
-        if (this.options.defaultProviders) {
-            this.options.providers.unshift(this.configoatProvider);
+        const validFallbacks = this.options.fallbacks.filter(f => f.save);
+        if (validFallbacks.length !== this.options.fallbacks.length) {
+            const invalidFallbacks = this.options.fallbacks.filter(f => !f.save);
 
-            if (!this.hasProvider("process.env")) {
-                this.options.providers.push(new EnvProvider());
-            }
+            console.warn(`Fallbacks ${invalidFallbacks.map(f => f.constructor.name).join(", ")} doesn't have a save method. Ignoring them.`)
         }
+        this.options.fallbacks = validFallbacks;
 
         if (this.options.apiUrl.endsWith("/")) {
             this.options.apiUrl = this.options.apiUrl.slice(0, -1);
         }
 
-        for (const provider of this.options.providers) {
-            // Inject required data
-            if (provider.name === "configoat") {
-                (provider as ConfigoatProvider).environments = this.options.environments;
-                (provider as ConfigoatProvider).apiUrl = this.options.apiUrl;
-            }
-
-            await provider.init();
+        if (this.options.configoatProvider) {
+            this.configoatProvider = new ConfigoatService(this.options.environments, this.options.apiUrl);
+            this.options.services.unshift(this.configoatProvider);
         }
 
-        await this.reload();
+        if (this.options.processEnvProvider) {
+            this.options.services.push(new EnvService());
+        }
+
+        // In memory provider is always first
+        this.options.services.unshift(new MemoryService());
+
+        let useFallbacks = false;
+
+        for (const provider of [...this.options.services, ...this.options.fallbacks]) {
+            try {
+                await provider.init?.();
+            }
+            catch (e) {
+                console.error("There was an error with one of the services during init, using fallback and removing this service.", e);
+                this.options.services = this.options.services.filter(s => s !== provider);
+                useFallbacks = true;
+            }
+        }
+
+        await this.reload(useFallbacks);
 
         if (this.options.autoReload) {
             this.startAutoReload(this.options.autoReloadInterval);
         }
     }
 
-    private hasProvider(name: string) {
-        return this.options.providers.some(p => p.name === name);
-    }
+    public async reload(useFallbacks = false) {
+        let newConfigs: InternalConfigurationsRecord = [];
 
-    public async reload() {
-        let newConfigs: ConfigurationsRecord = {};
-
-        for (const provider of this.options.providers) {
-            newConfigs = defaults(newConfigs, await provider.getAll());
+        for (const provider of this.options.services) {
+            try {
+                newConfigs.push({
+                    name: provider.constructor.name,
+                    config: await provider.get(),
+                    options: defaults(provider.options?.(), defaultProviderOptions) as ProviderOptions,
+                });
+            }
+            catch (e) {
+                console.error("There was an error with one of the providers during config fetching, using fallback", e);
+                useFallbacks = true;
+            }
         }
 
-        const oldConfigs = this.configs;        
+        if (useFallbacks) {
+            console.log("Using fallbacks");
+            
+            for (const fallback of this.options.fallbacks) {
+                try {
+                    newConfigs.push({
+                        name: fallback.constructor.name,
+                        config: await fallback.get(),
+                        options: defaults(fallback.options?.(), defaultProviderOptions) as ProviderOptions,
+                    });
+                }
+                catch (e) {
+                    console.error("There was an error with one of the fallbacks", e);
+                }
+            }
+        }
+
+        const oldConfigurationRecord = this.configurationRecord;
         this.configs = newConfigs;
-        process.env = newConfigs;
+        const newConfigurationRecord = this.configurationRecord;
+
+        if (this.options.setProcessEnv) {
+            process.env = newConfigurationRecord;
+        }
+
+        this.saveToFallbacksInBackground();
 
         // Optional things to do after reload. It happens after setting the config just in case error happens.
-        const deleted = Object.keys(oldConfigs).filter(key => !(key in newConfigs));
-        const created = Object.keys(newConfigs).filter(key => !(key in oldConfigs));
-        const updated = Object.keys(newConfigs).filter(key => key in oldConfigs && !deepEqual(newConfigs[key], oldConfigs[key]));
-    
+        const deleted = Object.keys(oldConfigurationRecord).filter(key => !(key in newConfigurationRecord));
+        const created = Object.keys(newConfigurationRecord).filter(key => !(key in oldConfigurationRecord));
+        const updated = Object.keys(newConfigurationRecord).filter(key => key in oldConfigurationRecord && !deepEqual(newConfigurationRecord[key], oldConfigurationRecord[key]));
+
         this.eventEmitter.emit("reload", {
             deleted,
             created,
@@ -133,48 +188,91 @@ export class Configoat {
     private async startAutoReload(interval: number) {
         setInterval(() => {
             this.reload();
-        }, interval);   
+        }, interval);
+    }
+
+    private async changeConfigSideEffects() {
+        if (this.options.setProcessEnv) {
+            process.env = this.configurationRecord;
+        }
+
+        this.saveToFallbacksInBackground();
     }
 
     private async setConfig(key: string, value: any) {
-        this.configs[key] = value;
+        const configServiceData = this.configs.find(v => key in v.config);
 
-        if (this.options.setProcessEnv) {
-            process.env[key] = value;
+        const setInMemory = async () => {
+            this.configs[0].config[key] = value;
+            await this.changeConfigSideEffects();
+            await this.options.services[0].update!(key, value, this.options.modifyConfigBehavior);
         }
 
-        if (this.options.modifyConfigBehavior === ModifyConfigBehavior.FIRST_ENVIRONMENT) {
-            await this.configoatProvider.updateFirst(key, value);
+        // Local always behaves the same
+        if (this.options.modifyConfigBehavior === ModifyConfigBehavior.MEMORY) {
+            await setInMemory();
+            return;
         }
-        else if (this.options.modifyConfigBehavior === ModifyConfigBehavior.ALL_ENVIRONMENTS) {
-            await this.configoatProvider.updateAll(key, value);
+
+        // If all services should be updated, update all of them no matter what
+        if (this.options.modifyConfigBehavior === ModifyConfigBehavior.ALL) {
+            await setInMemory();
+            await Promise.all(this.options.services.slice(1).filter(s => s.update).map(async s => {
+                try {
+                    await s.update!(key, value, this.options.modifyConfigBehavior);
+                }
+                catch (e) {
+                    console.error(`Error updating ${s.constructor.name}. The rest of the services are updated.`, e);
+                }
+            }));
+            return;
         }
-        else if (this.options.modifyConfigBehavior === ModifyConfigBehavior.LOCAL_ONLY) {
-            // Do nothing
+
+        // If first one should be updated, there's some logic
+        if (this.options.modifyConfigBehavior === ModifyConfigBehavior.FIRST) {
+            // If the config doesn't exist, updating the first service that supports updating
+            if (!configServiceData) {
+                const service = this.options.services.slice(1).find(s => s.update);
+
+                if (!service) {
+                    await setInMemory();
+                    return;
+                }
+
+                this.configs.find(v => v.name === service.constructor.name)!.config[key] = value;
+                await this.changeConfigSideEffects();
+                try {
+                    await service.update!(key, value, this.options.modifyConfigBehavior);
+                } catch (e) {
+                    console.error(`Error updating ${service.constructor.name}`, e);
+                }
+                return;
+            }
+
+            const configService = this.options.services.find(s => s.constructor.name === configServiceData.name);
+
+            // If config exists, but the service doesn't support updating, changing the value only in memory
+            if (!configService?.update) {
+                console.warn("Attempted to update a config that didn't come from a service that supports updating. Changing the value only in memory.");
+                await setInMemory();
+                return;
+            }
+
+            this.configs.find(v => v.name === configServiceData.name)!.config[key] = value;
+            await this.changeConfigSideEffects();
+            try {
+                await configService.update(key, value, this.options.modifyConfigBehavior);
+            } catch (e) {
+                console.error(`Error updating ${configService.constructor.name}`, e);
+            }
+            return;
         }
-        else {
-            throw new Error(`Invalid modifyConfigBehavior: ${this.options.modifyConfigBehavior}`);
-        }
+
+        throw new Error(`Invalid modifyConfigBehavior: ${this.options.modifyConfigBehavior}`);
     }
 
-    private async deleteConfig(key: string) {
-        delete this.configs[key];
-
-        if (this.options.setProcessEnv) {
-            delete process.env[key];
-        }
-
-        if (this.options.modifyConfigBehavior === ModifyConfigBehavior.FIRST_ENVIRONMENT) {
-            await this.configoatProvider.deleteFirst(key);
-        }
-        else if (this.options.modifyConfigBehavior === ModifyConfigBehavior.ALL_ENVIRONMENTS) {
-            await this.configoatProvider.deleteAll(key);
-        }
-        else if (this.options.modifyConfigBehavior === ModifyConfigBehavior.LOCAL_ONLY) {
-            // Do nothing
-        }
-        else {
-            throw new Error(`Invalid modifyConfigBehavior: ${this.options.modifyConfigBehavior}`);
-        }
+    private saveToFallbacksInBackground() {
+        const record = Object.values(this.configs).filter(v => v.options.useInFallback).reduce((acc, { config }) => (defaults(acc, config)), {});
+        Promise.all(this.options.fallbacks.map(fallback => fallback.save!(record).catch(console.error)));
     }
 }
