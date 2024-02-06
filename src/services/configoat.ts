@@ -7,7 +7,7 @@ export class ConfigoatService implements IService {
     private rawConfigs: any[] = [];
     private axios: AxiosInstance = axios.create();
 
-    constructor(private environments: Environment[], private apiUrl: string) {}
+    constructor(private environments: Environment[], private apiUrl: string) { }
 
     public async get(): Promise<ExposedConfigurationsRecord> {
         let configs: ExposedConfigurationsRecord = {};
@@ -83,25 +83,38 @@ export class ConfigoatService implements IService {
     }
 
     async updateFirst(key: string, value: string) {
-        const config = this.rawConfigs.find((config: any) => config.key === key);
-        if (!config) {
-            await this.createInEnvironment(this.environments[0].id, key, value);
-            return;
-        }
-        
-        await this.updateInEnvironment(config, key, value);
+        await this.updateEnvironmentMultiple(this.environments[0], {
+            [key]: value
+        });
     }
 
     async updateAll(key: string, value: string) {
-        for (const environment of this.environments) {
-            const config = this.rawConfigs.find((config: any) => config.key === key && config.environment === environment.id);
-            if (!config) {
-                await this.createInEnvironment(environment.id, key, value);
-                continue;
-            }
+        await this.updateAllMultiple({
+            [key]: value
+        });
+    }
 
-            await this.updateInEnvironment(config, key, value);
-        }
+    async updateEnvironmentMultiple(environment: Environment, _configs: ExposedConfigurationsRecord) {
+        const newConfig = Object.entries(_configs)
+            .filter(([key, _]) => !this.rawConfigs.find(c => c.key === key))
+            .map(([key, value]) => ({ key, value, notes: "" }));
+
+        const existingConfigs = this.rawConfigs.map(config => _configs[config.key] === undefined ? config : { ...config, value: _configs[config.key] });
+
+        await this.axios.patch(`${this.apiUrl}/v1/environments/${environment.id}/configs`, {
+            configs: [
+                ...newConfig,
+                ...existingConfigs,
+            ],
+        }, {
+            headers: {
+                Authorization: `Bearer ${environment.token}`
+            }
+        });
+    }
+
+    async updateAllMultiple(_configs: ExposedConfigurationsRecord) {
+        await Promise.all(this.environments.map(env => this.updateEnvironmentMultiple(env, _configs)));
     }
 
     private async deleteInEnvironment(config: any) {

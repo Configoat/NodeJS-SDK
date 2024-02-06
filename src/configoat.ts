@@ -192,6 +192,24 @@ export class Configoat {
         this.eventEmitter.off("reload", callback);
     }
 
+    public async import() {
+        if (!this.configoatProvider) {
+            throw new Error("Configoat provider must be initialized to perform input.");
+        }
+
+        if (this.options.modifyConfigBehavior === ModifyConfigBehavior.ALL) {
+            await this.configoatProvider.updateAllMultiple(this.configurationRecord);
+        }
+
+        else if (this.options.modifyConfigBehavior === ModifyConfigBehavior.FIRST) {
+            await this.configoatProvider.updateEnvironmentMultiple(this.options.environments[0], this.configurationRecord);
+        }
+
+        else {
+            throw new Error(`ModifyConfigBehavior ${this.options.modifyConfigBehavior} is not supported for import`);
+        }
+    }
+
     private async startAutoReload(interval: number) {
         setInterval(() => {
             this.reload();
