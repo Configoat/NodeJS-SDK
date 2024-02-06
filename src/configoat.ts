@@ -138,9 +138,7 @@ export class Configoat {
             }
         }
 
-        if (useFallbacks) {
-            console.log("Using fallbacks");
-            
+        if (useFallbacks) {            
             for (const fallback of this.options.fallbacks) {
                 try {
                     newConfigs.push({
