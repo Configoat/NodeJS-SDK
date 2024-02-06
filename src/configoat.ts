@@ -1,5 +1,5 @@
 import { defaults } from "lodash";
-import { ExposedConfigurationsRecord, InitOptions, InternalConfigurationsRecord, ModifyConfigBehavior, ProviderOptions } from "./types";
+import { Environment, ExposedConfigurationsRecord, InitOptions, InternalConfigurationsRecord, ModifyConfigBehavior, ProviderOptions } from "./types";
 import EventEmitter from "events";
 import { deepEqual } from "./utils";
 import { ConfigoatService, EnvService, MemoryService, LocalJSONService } from "./services";
@@ -7,6 +7,15 @@ import { ConfigoatService, EnvService, MemoryService, LocalJSONService } from ".
 const defaultProviderOptions: ProviderOptions = {
     useInFallback: true,
 };
+
+const defaultEnvs: Environment[] = process.env.CONFIGOAT_ENVIRONMENTS?.split(",").map(e => {
+    const data = e.trim().split(":");
+
+    return {
+        id: data[0],
+        token: data[1],
+    };
+}) || [];
 
 export class Configoat {
     // Static
@@ -40,7 +49,7 @@ export class Configoat {
     private options: InitOptions = {
         apiUrl: "https://api.configoat.com",
         services: [],
-        environments: [],
+        environments: defaultEnvs,
         fallbacks: [
             new LocalJSONService(),
         ],
