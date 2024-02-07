@@ -6,7 +6,7 @@ export type InitOptions = {
     services: IService[];
     fallbacks: IService[];
     configoatService: boolean;
-    processEnvService: boolean;
+    envService: boolean;
     autoReload: boolean;
     autoReloadInterval: number;
     setProcessEnv: boolean;

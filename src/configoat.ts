@@ -54,7 +54,7 @@ export class Configoat {
             new LocalJSONService(),
         ],
         configoatService: true,
-        processEnvService: true,
+        envService: true,
         autoReload: true,
         autoReloadInterval: 1000 * 60,
         setProcessEnv: false,
@@ -103,7 +103,7 @@ export class Configoat {
             this.options.services.unshift(this.configoatProvider);
         }
 
-        if (this.options.processEnvService) {
+        if (this.options.envService) {
             this.options.services.push(new EnvService());
         }
 
