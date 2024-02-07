@@ -1,4 +1,4 @@
-import { ExposedConfigurationsRecord, ProviderOptions } from "../types";
+import { ExposedConfigurationsRecord, ServiceOptions } from "../types";
 import { IService } from "./base";
 
 export class EnvService implements IService {
@@ -8,7 +8,7 @@ export class EnvService implements IService {
         return this.initialDotEnv;
     }
 
-    options(): Partial<ProviderOptions> {
+    options(): Partial<ServiceOptions> {
         return {
             useInFallback: false,
             useInImport: false,

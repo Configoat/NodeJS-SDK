@@ -1,4 +1,4 @@
-import { ExposedConfigurationsRecord, ModifyConfigBehavior, ProviderOptions } from "../types";
+import { ExposedConfigurationsRecord, ModifyConfigBehavior, ServiceOptions } from "../types";
 
 export interface IService {
     /**
@@ -8,7 +8,7 @@ export interface IService {
 
     get(): Promise<ExposedConfigurationsRecord>;
 
-    options?(): Partial<ProviderOptions>;
+    options?(): Partial<ServiceOptions>;
 
     update?(key: string, value: any, modifyConfigBehavior: ModifyConfigBehavior): Promise<void>;
 

@@ -23,7 +23,7 @@ export type ExposedConfigurationsRecord = Record<string, any>;
 export type InternalConfigurationsRecord = {
     name: string,
     config: ExposedConfigurationsRecord,
-    options: ProviderOptions,
+    options: ServiceOptions,
 }[];
 
 export enum ModifyConfigBehavior {
@@ -32,7 +32,7 @@ export enum ModifyConfigBehavior {
     ALL = "ALL",
 }
 
-export type ProviderOptions = {
+export type ServiceOptions = {
     useInFallback: boolean;
     useInImport: boolean;
 }

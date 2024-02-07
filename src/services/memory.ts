@@ -1,4 +1,4 @@
-import { ExposedConfigurationsRecord, ModifyConfigBehavior, ProviderOptions } from "../types";
+import { ExposedConfigurationsRecord, ModifyConfigBehavior, ServiceOptions } from "../types";
 import { IService } from "./base";
 
 export class MemoryService implements IService {

@@ -1,10 +1,10 @@
 import { defaults } from "lodash";
-import { Environment, ExposedConfigurationsRecord, InitOptions, InternalConfigurationsRecord, ModifyConfigBehavior, ProviderOptions } from "./types";
+import { Environment, ExposedConfigurationsRecord, InitOptions, InternalConfigurationsRecord, ModifyConfigBehavior, ServiceOptions } from "./types";
 import EventEmitter from "events";
 import { deepEqual } from "./utils";
 import { ConfigoatService, EnvService, MemoryService, LocalJSONService } from "./services";
 
-const defaultProviderOptions: ProviderOptions = {
+const defaultServiceOptions: ServiceOptions = {
     useInFallback: true,
     useInImport: true,
 };
@@ -66,7 +66,7 @@ export class Configoat {
         modifyConfigBehavior: ModifyConfigBehavior.FIRST,
     };
     private eventEmitter: EventEmitter = new EventEmitter();
-    private configoatProvider?: ConfigoatService;
+    private configoatService?: ConfigoatService;
     // Internal configs list
     private configs: InternalConfigurationsRecord = [];
     // Exposed configs list
@@ -104,26 +104,26 @@ export class Configoat {
         }
 
         if (this.options.configoatService) {
-            this.configoatProvider = new ConfigoatService(this.options.environments, this.options.apiUrl);
-            this.options.services.unshift(this.configoatProvider);
+            this.configoatService = new ConfigoatService(this.options.environments, this.options.apiUrl);
+            this.options.services.unshift(this.configoatService);
         }
 
         if (this.options.envService) {
             this.options.services.push(new EnvService());
         }
 
-        // In memory provider is always first
+        // In memory service is always first
         this.options.services.unshift(new MemoryService());
 
         let useFallbacks = false;
 
-        for (const provider of [...this.options.services, ...this.options.fallbacks]) {
+        for (const service of [...this.options.services, ...this.options.fallbacks]) {
             try {
-                await provider.init?.();
+                await service.init?.();
             }
             catch (e) {
                 console.error("There was an error with one of the services during init, using fallback and removing this service.", e);
-                this.options.services = this.options.services.filter(s => s !== provider);
+                this.options.services = this.options.services.filter(s => s !== service);
                 useFallbacks = true;
             }
         }
@@ -138,16 +138,16 @@ export class Configoat {
     public async reload(useFallbacks = false) {
         let newConfigs: InternalConfigurationsRecord = [];
 
-        for (const provider of this.options.services) {
+        for (const service of this.options.services) {
             try {
                 newConfigs.push({
-                    name: provider.constructor.name,
-                    config: await provider.get(),
-                    options: defaults(provider.options?.(), defaultProviderOptions) as ProviderOptions,
+                    name: service.constructor.name,
+                    config: await service.get(),
+                    options: defaults(service.options?.(), defaultServiceOptions) as ServiceOptions,
                 });
             }
             catch (e) {
-                console.error("There was an error with one of the providers during config fetching, using fallback", e);
+                console.error("There was an error with one of the services during config fetching, using fallback", e);
                 useFallbacks = true;
             }
         }
@@ -158,7 +158,7 @@ export class Configoat {
                     newConfigs.push({
                         name: fallback.constructor.name,
                         config: await fallback.get(),
-                        options: defaults(fallback.options?.(), defaultProviderOptions) as ProviderOptions,
+                        options: defaults(fallback.options?.(), defaultServiceOptions) as ServiceOptions,
                     });
                 }
                 catch (e) {
@@ -200,16 +200,16 @@ export class Configoat {
     public async import() {
         const record = Object.values(this.configs).filter(v => v.options.useInImport).reduce((acc, { config }) => (defaults(acc, config)), {});
 
-        if (!this.configoatProvider) {
-            throw new Error("Configoat provider must be initialized to perform input.");
+        if (!this.configoatService) {
+            throw new Error("Configoat service must be initialized to perform input.");
         }
 
         if (this.options.modifyConfigBehavior === ModifyConfigBehavior.ALL) {
-            await this.configoatProvider.updateAllMultiple(record);
+            await this.configoatService.updateAllMultiple(record);
         }
 
         else if (this.options.modifyConfigBehavior === ModifyConfigBehavior.FIRST) {
-            await this.configoatProvider.updateEnvironmentMultiple(this.options.environments[0], record);
+            await this.configoatService.updateEnvironmentMultiple(this.options.environments[0], record);
         }
 
         else {
