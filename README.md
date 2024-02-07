@@ -1,8 +1,3 @@
----
-slug: '/'
-title: "Introduction"
----
-
 Welcome to Configoat – your ultimate solution for efficient management of configurations, feature flags, and secrets within your team projects. Configoat is designed with the goal of streamlining configuration management processes for teams, empowering you to focus on your core tasks without getting bogged down by technical complexities.
 
 Please refer to the [Configoat documentation](https://docs.configoat.com) for the latest information.
