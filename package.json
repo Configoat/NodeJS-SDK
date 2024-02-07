@@ -1,10 +1,11 @@
 {
-  "name": "configoat",
+  "name": "@configoat/sdk",
   "version": "0.0.1",
   "description": "Configuration manager made for teams",
   "main": "build/index.js",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "publish": "npm publish --access public"
   },
   "repository": {
     "type": "git",
