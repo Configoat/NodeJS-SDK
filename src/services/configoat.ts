@@ -32,41 +32,6 @@ export class ConfigoatService implements IService {
         return configs;
     }
 
-    private async updateInEnvironment(config: any, key: string, value: string) {
-        await this.axios.patch(`${this.apiUrl}/v1/environments/${config.environment}/configs`, {
-            "configs": [
-                {
-                    "_id": config._id,
-                    "key": key,
-                    "value": value,
-                    "notes": config.notes
-                }
-            ]
-        }, {
-            headers: {
-                Authorization: `Bearer ${this.environments.find((env: Environment) => env.id === config.environment)?.token}`
-            }
-        });
-    }
-
-    private async createInEnvironment(environmentId: string, key: string, value: string) {
-        const resp = await this.axios.patch(`${this.apiUrl}/v1/environments/${environmentId}/configs`, {
-            "configs": [
-                {
-                    "key": key,
-                    "value": value,
-                    "notes": ""
-                }
-            ]
-        }, {
-            headers: {
-                Authorization: `Bearer ${this.environments.find((env: Environment) => env.id === environmentId)?.token}`
-            }
-        });
-
-        this.rawConfigs.push(resp.data.configs.at(-1));
-    }
-
     async update(key: string, value: any, modifyConfigBehavior: ModifyConfigBehavior) {
         if (modifyConfigBehavior === ModifyConfigBehavior.FIRST) {
             await (value === undefined ? this.deleteFirst(key) : this.updateFirst(key, value));
