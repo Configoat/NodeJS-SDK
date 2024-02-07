@@ -11,6 +11,7 @@ export class EnvService implements IService {
     options(): Partial<ProviderOptions> {
         return {
             useInFallback: false,
+            useInImport: false,
         };
     }
 }

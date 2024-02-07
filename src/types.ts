@@ -34,4 +34,5 @@ export enum ModifyConfigBehavior {
 
 export type ProviderOptions = {
     useInFallback: boolean;
+    useInImport: boolean;
 }

@@ -6,6 +6,7 @@ import { ConfigoatService, EnvService, MemoryService, LocalJSONService } from ".
 
 const defaultProviderOptions: ProviderOptions = {
     useInFallback: true,
+    useInImport: true,
 };
 
 const defaultEnvs: Environment[] = process.env.CONFIGOAT_ENVIRONMENTS?.split(",").map(e => {
@@ -42,6 +43,10 @@ export class Configoat {
 
     public static async offReload(callback: (changes: { deleted: string[], created: string[], updated: string[] }) => void) {
         await Configoat.instance.offReload(callback);
+    }
+
+    public static async import() {
+        await Configoat.instance.import();
     }
 
     // Instance
@@ -193,16 +198,18 @@ export class Configoat {
     }
 
     public async import() {
+        const record = Object.values(this.configs).filter(v => v.options.useInImport).reduce((acc, { config }) => (defaults(acc, config)), {});
+
         if (!this.configoatProvider) {
             throw new Error("Configoat provider must be initialized to perform input.");
         }
 
         if (this.options.modifyConfigBehavior === ModifyConfigBehavior.ALL) {
-            await this.configoatProvider.updateAllMultiple(this.configurationRecord);
+            await this.configoatProvider.updateAllMultiple(record);
         }
 
         else if (this.options.modifyConfigBehavior === ModifyConfigBehavior.FIRST) {
-            await this.configoatProvider.updateEnvironmentMultiple(this.options.environments[0], this.configurationRecord);
+            await this.configoatProvider.updateEnvironmentMultiple(this.options.environments[0], record);
         }
 
         else {
