@@ -53,8 +53,8 @@ export class Configoat {
         fallbacks: [
             new LocalJSONService(),
         ],
-        configoatProvider: true,
-        processEnvProvider: true,
+        configoatService: true,
+        processEnvService: true,
         autoReload: true,
         autoReloadInterval: 1000 * 60,
         setProcessEnv: false,
@@ -98,12 +98,12 @@ export class Configoat {
             this.options.apiUrl = this.options.apiUrl.slice(0, -1);
         }
 
-        if (this.options.configoatProvider) {
+        if (this.options.configoatService) {
             this.configoatProvider = new ConfigoatService(this.options.environments, this.options.apiUrl);
             this.options.services.unshift(this.configoatProvider);
         }
 
-        if (this.options.processEnvProvider) {
+        if (this.options.processEnvService) {
             this.options.services.push(new EnvService());
         }
 
