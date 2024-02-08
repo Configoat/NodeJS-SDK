@@ -1,7 +1,7 @@
 import { defaults } from "lodash";
 import { Environment, ExposedConfigurationsRecord, InitOptions, InternalConfigurationsRecord, ModifyConfigBehavior, ServiceOptions } from "./types";
 import EventEmitter from "events";
-import { deepEqual } from "./utils";
+import { deepEqual, getLocalConfig } from "./utils";
 import { ConfigoatService, EnvService, MemoryService, LocalJSONService } from "./services";
 
 const defaultServiceOptions: ServiceOptions = {
@@ -16,7 +16,10 @@ const defaultEnvs: Environment[] = process.env.CONFIGOAT_ENVIRONMENTS?.split(","
         id: data[0],
         token: data[1],
     };
-}) || [];
+}) || [{
+    id: getLocalConfig("environment"),
+    token: getLocalConfig("token"),
+}] || [];
 
 export class Configoat {
     // Static

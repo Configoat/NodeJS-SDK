@@ -9,6 +9,20 @@ export class ConfigoatService implements IService {
 
     constructor(private environments: Environment[], private apiUrl: string) { }
 
+    private getToken(env: string) {
+        const token = this.environments.find(e => e.id === env)?.token;
+
+        if (!token) {
+            throw new Error(`Token not found for environment ${env}`);
+        }
+
+        if (token.startsWith("U")) {
+            return `User ${token}`;
+        }
+
+        return `Bearer ${token}`;
+    }
+
     public async get(): Promise<ExposedConfigurationsRecord> {
         let configs: ExposedConfigurationsRecord = {};
         let _rawConfigs: any[] = [];
@@ -16,7 +30,7 @@ export class ConfigoatService implements IService {
         for (const environment of this.environments) {
             const resp = await this.axios.get(`${this.apiUrl}/v1/environments/${environment.id}/configs`, {
                 headers: {
-                    Authorization: `Bearer ${environment.token}`
+                    Authorization: this.getToken(environment.id)
                 }
             });
 
@@ -73,7 +87,7 @@ export class ConfigoatService implements IService {
             ],
         }, {
             headers: {
-                Authorization: `Bearer ${environment.token}`
+                Authorization: this.getToken(environment.id)
             }
         });
     }
@@ -85,7 +99,7 @@ export class ConfigoatService implements IService {
     private async deleteInEnvironment(config: any) {
         await this.axios.delete(`${this.apiUrl}/v1/environments/${config.environment}/configs`, {
             headers: {
-                Authorization: `Bearer ${this.environments.find((env: Environment) => env.id === config.environment)?.token}`
+                Authorization: this.getToken(config.environment)
             },
             data: {
                 "configs": [
