@@ -11,6 +11,7 @@ export type InitOptions = {
     autoReloadInterval: number;
     setProcessEnv: boolean;
     modifyConfigBehavior: ModifyConfigBehavior;
+    preferDotEnv: boolean;
 }
 
 export type Environment = {

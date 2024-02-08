@@ -9,6 +9,8 @@ const defaultServiceOptions: ServiceOptions = {
     useInImport: true,
 };
 
+const defaultPreferDotEnv = process.env.CONFIGOAT_PREFER_DOTENV === "true";
+
 const defaultEnvs: Environment[] = process.env.CONFIGOAT_ENVIRONMENTS?.split(",").map(e => {
     const data = e.trim().split(":");
 
@@ -67,6 +69,7 @@ export class Configoat {
         autoReloadInterval: 1000 * 60,
         setProcessEnv: false,
         modifyConfigBehavior: ModifyConfigBehavior.FIRST,
+        preferDotEnv: defaultPreferDotEnv,
     };
     private eventEmitter: EventEmitter = new EventEmitter();
     private configoatService?: ConfigoatService;
@@ -112,7 +115,12 @@ export class Configoat {
         }
 
         if (this.options.envService) {
-            this.options.services.push(new EnvService());
+            if (this.options.preferDotEnv) {
+                this.options.services.unshift(new EnvService());
+            }
+            else {
+                this.options.services.push(new EnvService());
+            }
         }
 
         // In memory service is always first
