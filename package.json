@@ -1,11 +1,11 @@
 {
   "name": "@configoat/sdk",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Configuration manager made for teams",
   "main": "build/index.js",
   "scripts": {
     "build": "tsc",
-    "release": "npm i --package-lock-only && npm publish --access public"
+    "release": "npm i --package-lock-only && npm run build && npm publish --access public"
   },
   "repository": {
     "type": "git",
